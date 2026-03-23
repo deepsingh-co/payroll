@@ -1,0 +1,110 @@
+from flask import Blueprint, request, jsonify
+from extensions import db
+from models import Employee, User
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+
+employee_bp = Blueprint('employees', __name__)
+
+@employee_bp.route('/', methods=['GET'])
+@jwt_required()
+def get_employees():
+    employees = Employee.query.all()
+    result = []
+    for emp in employees:
+        result.append({
+            'id': emp.id,
+            'user_id': emp.user_id,
+            'name': emp.name,
+            'role': emp.role,
+            'department': emp.department,
+            'salary': emp.salary,
+            'status': emp.status
+        })
+    return jsonify(result), 200
+
+@employee_bp.route('/', methods=['POST'])
+@jwt_required()
+def add_employee():
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    data = request.get_json()
+    name = data.get('name')
+    role = data.get('role', 'Developer')
+    department = data.get('department', 'Engineering')
+    salary = data.get('salary', 0)
+    email = data.get('email')
+    password = data.get('password', 'employee123')
+
+    if not name or not email:
+        return jsonify({'error': 'Name and email are required'}), 400
+
+    # Create a User account for the employee
+    from extensions import bcrypt
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'Email already registered'}), 400
+
+    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+    new_user = User(name=name, email=email, password=hashed_password, role='employee', is_verified=True)
+    db.session.add(new_user)
+    db.session.flush()  # get the new_user.id
+
+    employee = Employee(
+        user_id=new_user.id,
+        name=name,
+        role=role,
+        department=department,
+        salary=salary
+    )
+    db.session.add(employee)
+    db.session.commit()
+
+    return jsonify({
+        'id': employee.id,
+        'user_id': employee.user_id,
+        'name': employee.name,
+        'role': employee.role,
+        'department': employee.department,
+        'salary': employee.salary
+    }), 201
+
+@employee_bp.route('/<int:id>', methods=['PUT'])
+@jwt_required()
+def update_employee(id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    employee = Employee.query.get_or_404(id)
+    data = request.get_json()
+
+    employee.name = data.get('name', employee.name)
+    employee.role = data.get('role', employee.role)
+    employee.department = data.get('department', employee.department)
+    employee.salary = data.get('salary', employee.salary)
+    employee.status = data.get('status', employee.status)
+
+    db.session.commit()
+
+    return jsonify({
+        'id': employee.id,
+        'name': employee.name,
+        'role': employee.role,
+        'department': employee.department,
+        'salary': employee.salary,
+        'status': employee.status
+    }), 200
+
+@employee_bp.route('/<int:id>', methods=['DELETE'])
+@jwt_required()
+def delete_employee(id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    employee = Employee.query.get_or_404(id)
+    db.session.delete(employee)
+    db.session.commit()
+
+    return jsonify({'message': 'Employee deleted successfully'}), 200
