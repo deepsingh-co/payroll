@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from extensions import db
 
 class User(db.Model):
@@ -74,3 +74,16 @@ class Leave(db.Model):
     from_date = db.Column(db.DateTime, nullable=False)
     to_date = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(20), default='pending')
+
+
+class Attendance(db.Model):
+    __tablename__ = 'attendances'
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
+    date = db.Column(db.Date, default=date.today, nullable=False)
+    check_in = db.Column(db.DateTime)
+    check_out = db.Column(db.DateTime)
+    duration_hours = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(20), default='absent')
+
+    employee = db.relationship('Employee', backref='attendances')

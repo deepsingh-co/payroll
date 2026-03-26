@@ -6,6 +6,7 @@ from routes.teams import team_bp
 from routes.tasks import task_bp
 from routes.payroll import payroll_bp
 from routes.leaves import leave_bp
+from routes.attendance import attendance_bp
 
 def create_app():
     app = Flask(__name__)
@@ -30,6 +31,7 @@ def create_app():
     app.register_blueprint(task_bp, url_prefix='/api/tasks')
     app.register_blueprint(payroll_bp, url_prefix='/api/payroll')
     app.register_blueprint(leave_bp, url_prefix='/api/leaves')
+    app.register_blueprint(attendance_bp, url_prefix='/api/attendance')
     
     @app.route('/api/health')
     def health_check():
