@@ -13,13 +13,22 @@ def create_app():
     
     # Configuration
     app.config['SECRET_KEY'] = 'dev-secret-key-12345'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///payroll.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['MONGODB_SETTINGS'] = {
+        'db': 'payroll_db',
+        'host': 'localhost',
+        'port': 27017
+    }
     app.config['JWT_SECRET_KEY'] = 'jwt-secret-key-12345'
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False # For dev testing
     
     # Initialize extensions
-    db.init_app(app)
+    # Connect to MongoDB
+    db.connect(
+        db=app.config['MONGODB_SETTINGS']['db'],
+        host=app.config['MONGODB_SETTINGS']['host'],
+        port=app.config['MONGODB_SETTINGS']['port']
+    )
+    
     jwt.init_app(app)
     cors.init_app(app)
     bcrypt.init_app(app)
@@ -41,6 +50,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)

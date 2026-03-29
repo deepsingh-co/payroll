@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from extensions import db
-from models import Task, Employee
+from models import Task, Employee, Payroll
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from datetime import datetime
 
@@ -14,20 +14,20 @@ def get_all_tasks():
     role = claims.get('role')
 
     if role == 'admin':
-        tasks = Task.query.all()
+        tasks = Task.objects.all()
     else:
-        employee = Employee.query.filter_by(user_id=user_id).first()
+        employee = Employee.objects(user_id=user_id).first()
         if not employee:
             return jsonify([]), 200
-        tasks = Task.query.filter_by(assigned_to=employee.id).all()
+        tasks = Task.objects(assigned_to=employee.id).all()
 
     result = []
     for task in tasks:
-        assignee = Employee.query.get(task.assigned_to) if task.assigned_to else None
+        assignee = Employee.objects(id=task.assigned_to.id).first() if task.assigned_to else None
         result.append({
-            'id': task.id,
+            'id': str(task.id),
             'title': task.title,
-            'assigned_to': task.assigned_to,
+            'assigned_to': str(task.assigned_to.id) if task.assigned_to else None,
             'assignee_name': assignee.name if assignee else 'Unassigned',
             'complexity_score': task.complexity_score,
             'estimated_hours': task.estimated_hours,
@@ -47,7 +47,7 @@ def assign_task():
 
     data = request.get_json()
     title = data.get('title')
-    assigned_to = data.get('assigned_to')
+    assigned_to_id = data.get('assigned_to')
     complexity_score = data.get('complexity_score', 1)
     estimated_hours = data.get('estimated_hours', 1)
     deadline_str = data.get('deadline')
@@ -62,6 +62,10 @@ def assign_task():
         except ValueError:
             return jsonify({'error': 'Invalid date format. Use ISO format.'}), 400
 
+    assigned_to = None
+    if assigned_to_id:
+        assigned_to = Employee.objects(id=assigned_to_id).first()
+
     task = Task(
         title=title,
         assigned_to=assigned_to,
@@ -69,16 +73,13 @@ def assign_task():
         estimated_hours=estimated_hours,
         deadline=deadline
     )
+    task.save()
 
-    db.session.add(task)
-    db.session.commit()
-
-    assignee = Employee.query.get(assigned_to) if assigned_to else None
     return jsonify({
-        'id': task.id,
+        'id': str(task.id),
         'title': task.title,
-        'assigned_to': task.assigned_to,
-        'assignee_name': assignee.name if assignee else 'Unassigned',
+        'assigned_to': str(task.assigned_to.id) if task.assigned_to else None,
+        'assignee_name': task.assigned_to.name if task.assigned_to else 'Unassigned',
         'status': task.status
     }), 201
 
@@ -88,21 +89,21 @@ def my_tasks():
     user_id = get_jwt_identity()
     claims = get_jwt()
 
-    employee = Employee.query.filter_by(user_id=user_id).first()
+    employee = Employee.objects(user_id=user_id).first()
     if not employee:
         if claims.get('role') == 'admin':
-            tasks = Task.query.all()
+            tasks = Task.objects.all()
         else:
             return jsonify({'error': 'Employee record not found'}), 404
     else:
-        tasks = Task.query.filter_by(assigned_to=employee.id).all()
+        tasks = Task.objects(assigned_to=employee.id).all()
 
     result = []
     for task in tasks:
         result.append({
-            'id': task.id,
+            'id': str(task.id),
             'title': task.title,
-            'assigned_to': task.assigned_to,
+            'assigned_to': str(task.assigned_to.id) if task.assigned_to else None,
             'complexity_score': task.complexity_score,
             'estimated_hours': task.estimated_hours,
             'actual_hours': task.actual_hours,
@@ -111,19 +112,22 @@ def my_tasks():
         })
     return jsonify(result), 200
 
-@task_bp.route('/<int:id>', methods=['PUT'])
+@task_bp.route('/<string:id>', methods=['PUT'])
 @jwt_required()
 def update_task_status(id):
     user_id = get_jwt_identity()
     claims = get_jwt()
-    task = Task.query.get_or_404(id)
+    task = Task.objects(id=id).first()
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
 
-    employee = Employee.query.filter_by(user_id=user_id).first()
-    if claims.get('role') != 'admin' and (not employee or task.assigned_to != employee.id):
+    employee = Employee.objects(user_id=user_id).first()
+    if claims.get('role') != 'admin' and (not employee or task.assigned_to.id != employee.id):
         return jsonify({'error': 'Unauthorized'}), 403
 
     data = request.get_json()
-
+    old_status = task.status
+    
     if 'status' in data:
         task.status = data['status']
     if 'actual_hours' in data:
@@ -131,21 +135,52 @@ def update_task_status(id):
     if 'title' in data and claims.get('role') == 'admin':
         task.title = data['title']
     if 'assigned_to' in data and claims.get('role') == 'admin':
-        task.assigned_to = data['assigned_to']
+        task.assigned_to = Employee.objects(id=data['assigned_to']).first()
 
-    db.session.commit()
+    task.save()
+
+    # Auto salary calculation logic:
+    # If task is marked as completed, calculate bonus and update/create payroll record
+    if task.status == 'completed' and old_status != 'completed' and task.assigned_to:
+        emp = task.assigned_to
+        current_month = datetime.utcnow().strftime('%Y-%m')
+        
+        # Calculate bonus based on complexity and actual hours
+        # Formula: complexity * 500 + (estimated - actual) * 100 (if positive)
+        bonus_amount = task.complexity_score * 500
+        if task.estimated_hours and task.actual_hours:
+            if task.estimated_hours > task.actual_hours:
+                bonus_amount += (task.estimated_hours - task.actual_hours) * 100
+        
+        # Find or create payroll record for this month
+        payroll = Payroll.objects(employee=emp, month=current_month).first()
+        if not payroll:
+            payroll = Payroll(
+                employee=emp,
+                month=current_month,
+                basic_salary=emp.salary or 0,
+                bonus=bonus_amount,
+                tax=0,
+                deductions=0
+            )
+        else:
+            payroll.bonus += bonus_amount
+        
+        payroll.net_salary = (payroll.basic_salary + payroll.bonus) - (payroll.tax + payroll.deductions)
+        payroll.save()
 
     return jsonify({'message': 'Task updated successfully', 'status': task.status}), 200
 
-@task_bp.route('/<int:id>', methods=['DELETE'])
+@task_bp.route('/<string:id>', methods=['DELETE'])
 @jwt_required()
 def delete_task(id):
     claims = get_jwt()
     if claims.get('role') != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
 
-    task = Task.query.get_or_404(id)
-    db.session.delete(task)
-    db.session.commit()
-
+    task = Task.objects(id=id).first()
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+    
+    task.delete()
     return jsonify({'message': 'Task deleted successfully'}), 200

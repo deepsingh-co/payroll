@@ -1,89 +1,65 @@
 from datetime import datetime, date
 from extensions import db
 
-class User(db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), default='employee') # admin / employee
-    is_verified = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    employee = db.relationship('Employee', backref='user', uselist=False)
+class User(db.Document):
+    meta = {'collection': 'users'}
+    name = db.StringField(max_length=100, required=True)
+    email = db.StringField(max_length=120, unique=True, required=True)
+    password = db.StringField(max_length=200, required=True)
+    role = db.StringField(max_length=20, default='employee') # admin / employee
+    is_verified = db.BooleanField(default=False)
+    created_at = db.DateTimeField(default=datetime.utcnow)
 
-class Employee(db.Model):
-    __tablename__ = 'employees'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    role = db.Column(db.String(50))
-    department = db.Column(db.String(50))
-    salary = db.Column(db.Float)
-    status = db.Column(db.String(20), default='active')
-    
-    tasks = db.relationship('Task', backref='assignee', lazy=True)
-    payrolls = db.relationship('Payroll', backref='employee', lazy=True)
-    leaves = db.relationship('Leave', backref='employee', lazy=True)
-    teams_led = db.relationship('Team', backref='leader', lazy=True)
+class Employee(db.Document):
+    meta = {'collection': 'employees'}
+    user_id = db.ReferenceField(User, required=True)
+    name = db.StringField(max_length=100, required=True)
+    role = db.StringField(max_length=50)
+    department = db.StringField(max_length=50)
+    salary = db.FloatField()
+    status = db.StringField(max_length=20, default='active')
 
-class Team(db.Model):
-    __tablename__ = 'teams'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    department = db.Column(db.String(50))
-    leader_id = db.Column(db.Integer, db.ForeignKey('employees.id'))
-    
-    members = db.relationship('Employee', secondary='team_members', backref='teams')
+class Team(db.Document):
+    meta = {'collection': 'teams'}
+    name = db.StringField(max_length=100, required=True)
+    department = db.StringField(max_length=50)
+    leader = db.ReferenceField(Employee)
+    members = db.ListField(db.ReferenceField(Employee))
 
-class TeamMember(db.Model):
-    __tablename__ = 'team_members'
-    id = db.Column(db.Integer, primary_key=True)
-    team_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=False)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
+class Task(db.Document):
+    meta = {'collection': 'tasks'}
+    title = db.StringField(max_length=200, required=True)
+    assigned_to = db.ReferenceField(Employee)
+    complexity_score = db.IntField(default=1)
+    estimated_hours = db.FloatField()
+    actual_hours = db.FloatField()
+    deadline = db.DateTimeField()
+    status = db.StringField(max_length=20, default='pending') # pending / in-progress / completed
+    created_at = db.DateTimeField(default=datetime.utcnow)
 
-class Task(db.Model):
-    __tablename__ = 'tasks'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    assigned_to = db.Column(db.Integer, db.ForeignKey('employees.id'))
-    complexity_score = db.Column(db.Integer, default=1)
-    estimated_hours = db.Column(db.Float)
-    actual_hours = db.Column(db.Float)
-    deadline = db.Column(db.DateTime)
-    status = db.Column(db.String(20), default='pending')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+class Payroll(db.Document):
+    meta = {'collection': 'payrolls'}
+    employee = db.ReferenceField(Employee, required=True)
+    basic_salary = db.FloatField()
+    bonus = db.FloatField(default=0)
+    tax = db.FloatField(default=0)
+    deductions = db.FloatField(default=0)
+    net_salary = db.FloatField()
+    month = db.StringField(max_length=20) # e.g., '2023-10'
 
-class Payroll(db.Model):
-    __tablename__ = 'payrolls'
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
-    basic_salary = db.Column(db.Float)
-    bonus = db.Column(db.Float, default=0)
-    tax = db.Column(db.Float, default=0)
-    deductions = db.Column(db.Float, default=0)
-    net_salary = db.Column(db.Float)
-    month = db.Column(db.String(20)) # e.g., '2023-10'
+class Leave(db.Document):
+    meta = {'collection': 'leaves'}
+    employee = db.ReferenceField(Employee, required=True)
+    type = db.StringField(max_length=50)
+    from_date = db.DateTimeField(required=True)
+    to_date = db.DateTimeField(required=True)
+    status = db.StringField(max_length=20, default='pending')
 
-class Leave(db.Model):
-    __tablename__ = 'leaves'
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
-    type = db.Column(db.String(50))
-    from_date = db.Column(db.DateTime, nullable=False)
-    to_date = db.Column(db.DateTime, nullable=False)
-    status = db.Column(db.String(20), default='pending')
-
-
-class Attendance(db.Model):
-    __tablename__ = 'attendances'
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
-    date = db.Column(db.Date, default=date.today, nullable=False)
-    check_in = db.Column(db.DateTime)
-    check_out = db.Column(db.DateTime)
-    duration_hours = db.Column(db.Float, default=0.0)
-    status = db.Column(db.String(20), default='absent')
-
-    employee = db.relationship('Employee', backref='attendances')
+class Attendance(db.Document):
+    meta = {'collection': 'attendances'}
+    employee = db.ReferenceField(Employee, required=True)
+    date = db.DateTimeField(default=datetime.utcnow)
+    check_in = db.DateTimeField()
+    check_out = db.DateTimeField()
+    duration_hours = db.FloatField(default=0.0)
+    status = db.StringField(max_length=20, default='absent')

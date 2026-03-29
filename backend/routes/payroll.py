@@ -13,19 +13,19 @@ def get_all_payrolls():
     user_id = get_jwt_identity()
 
     if role == 'admin':
-        payrolls = Payroll.query.all()
+        payrolls = Payroll.objects.all()
     else:
-        employee = Employee.query.filter_by(user_id=user_id).first()
+        employee = Employee.objects(user_id=user_id).first()
         if not employee:
             return jsonify([]), 200
-        payrolls = Payroll.query.filter_by(employee_id=employee.id).all()
+        payrolls = Payroll.objects(employee=employee.id).all()
 
     result = []
     for payroll in payrolls:
-        emp = Employee.query.get(payroll.employee_id)
+        emp = Employee.objects(id=payroll.employee.id).first()
         result.append({
-            'id': payroll.id,
-            'employee_id': payroll.employee_id,
+            'id': str(payroll.id),
+            'employee_id': str(payroll.employee.id),
             'employee_name': emp.name if emp else 'Unknown',
             'basic_salary': payroll.basic_salary,
             'bonus': payroll.bonus,
@@ -53,11 +53,11 @@ def generate_payroll():
     if not employee_id or not month:
         return jsonify({'error': 'Employee ID and month are required'}), 400
 
-    employee = Employee.query.get(employee_id)
+    employee = Employee.objects(id=employee_id).first()
     if not employee:
         return jsonify({'error': 'Employee not found'}), 404
 
-    existing = Payroll.query.filter_by(employee_id=employee_id, month=month).first()
+    existing = Payroll.objects(employee=employee_id, month=month).first()
     if existing:
         return jsonify({'error': 'Payroll already generated for this month'}), 400
 
@@ -65,7 +65,7 @@ def generate_payroll():
     net_salary = basic_salary + bonus - tax - deductions
 
     payroll = Payroll(
-        employee_id=employee_id,
+        employee=employee,
         basic_salary=basic_salary,
         bonus=bonus,
         tax=tax,
@@ -73,13 +73,11 @@ def generate_payroll():
         net_salary=net_salary,
         month=month
     )
-
-    db.session.add(payroll)
-    db.session.commit()
+    payroll.save()
 
     return jsonify({
-        'id': payroll.id,
-        'employee_id': payroll.employee_id,
+        'id': str(payroll.id),
+        'employee_id': str(payroll.employee.id),
         'employee_name': employee.name,
         'basic_salary': payroll.basic_salary,
         'bonus': payroll.bonus,
@@ -89,24 +87,24 @@ def generate_payroll():
         'month': payroll.month
     }), 201
 
-@payroll_bp.route('/<int:employee_id>', methods=['GET'])
+@payroll_bp.route('/<string:employee_id>', methods=['GET'])
 @jwt_required()
-def get_payroll(employee_id):
+def get_payroll_for_employee(employee_id):
     claims = get_jwt()
     user_id = get_jwt_identity()
     role = claims.get('role')
 
     if role != 'admin':
-        employee = Employee.query.filter_by(user_id=user_id).first()
-        if not employee or employee.id != employee_id:
+        employee = Employee.objects(user_id=user_id).first()
+        if not employee or str(employee.id) != employee_id:
             return jsonify({'error': 'Unauthorized'}), 403
 
-    payrolls = Payroll.query.filter_by(employee_id=employee_id).all()
+    payrolls = Payroll.objects(employee=employee_id).all()
 
     result = []
     for payroll in payrolls:
         result.append({
-            'id': payroll.id,
+            'id': str(payroll.id),
             'basic_salary': payroll.basic_salary,
             'bonus': payroll.bonus,
             'tax': payroll.tax,

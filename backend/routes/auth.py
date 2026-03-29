@@ -17,15 +17,14 @@ def register():
     if not name or not email or not password:
         return jsonify({'error': 'Name, email, and password are required'}), 400
         
-    if User.query.filter_by(email=email).first():
+    if User.objects(email=email).first():
         return jsonify({'error': 'Email already registered'}), 400
         
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
     
     # In a real app we might only allow admin to create 'admin' roles, but allowing it for simplicity
     new_user = User(name=name, email=email, password=hashed_password, role=role, is_verified=True)
-    db.session.add(new_user)
-    db.session.commit()
+    new_user.save()
     
     return jsonify({'message': 'User registered successfully'}), 201
 
@@ -35,7 +34,7 @@ def login():
     email = data.get('email')
     password = data.get('password')
     
-    user = User.query.filter_by(email=email).first()
+    user = User.objects(email=email).first()
     print(f"Login attempt: {email}")
     if user:
         match = bcrypt.check_password_hash(user.password, password)
@@ -52,13 +51,13 @@ def login():
 @jwt_required()
 def profile():
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = User.objects(id=current_user_id).first()
     
     if not user:
         return jsonify({'error': 'User not found'}), 404
         
     return jsonify({
-        'id': user.id,
+        'id': str(user.id),
         'name': user.name,
         'email': user.email,
         'role': user.role

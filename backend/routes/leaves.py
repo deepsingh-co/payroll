@@ -11,7 +11,7 @@ leave_bp = Blueprint('leaves', __name__)
 def apply_leave():
     user_id = get_jwt_identity()
 
-    employee = Employee.query.filter_by(user_id=user_id).first()
+    employee = Employee.objects(user_id=user_id).first()
     if not employee:
         return jsonify({'error': 'Employee record not found'}), 404
 
@@ -30,17 +30,15 @@ def apply_leave():
         return jsonify({'error': 'Invalid date format. Use ISO format.'}), 400
 
     leave = Leave(
-        employee_id=employee.id,
+        employee=employee,
         type=leave_type,
         from_date=from_date,
         to_date=to_date,
         status='pending'
     )
+    leave.save()
 
-    db.session.add(leave)
-    db.session.commit()
-
-    return jsonify({'message': 'Leave applied successfully', 'id': leave.id}), 201
+    return jsonify({'message': 'Leave applied successfully', 'id': str(leave.id)}), 201
 
 @leave_bp.route('/', methods=['GET'])
 @jwt_required()
@@ -50,19 +48,19 @@ def get_leaves():
     role = claims.get('role')
 
     if role == 'admin':
-        leaves = Leave.query.all()
+        leaves = Leave.objects.all()
     else:
-        employee = Employee.query.filter_by(user_id=user_id).first()
+        employee = Employee.objects(user_id=user_id).first()
         if not employee:
             return jsonify({'error': 'Employee record not found'}), 404
-        leaves = Leave.query.filter_by(employee_id=employee.id).all()
+        leaves = Leave.objects(employee=employee.id).all()
 
     result = []
     for leave in leaves:
-        emp = Employee.query.get(leave.employee_id)
+        emp = Employee.objects(id=leave.employee.id).first()
         result.append({
-            'id': leave.id,
-            'employee_id': leave.employee_id,
+            'id': str(leave.id),
+            'employee_id': str(leave.employee.id),
             'employee_name': emp.name if emp else 'Unknown',
             'type': leave.type,
             'from_date': leave.from_date.isoformat(),
@@ -71,14 +69,17 @@ def get_leaves():
         })
     return jsonify(result), 200
 
-@leave_bp.route('/<int:id>', methods=['PUT'])
+@leave_bp.route('/<string:id>', methods=['PUT'])
 @jwt_required()
 def approve_leave(id):
     claims = get_jwt()
     if claims.get('role') != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
 
-    leave = Leave.query.get_or_404(id)
+    leave = Leave.objects(id=id).first()
+    if not leave:
+        return jsonify({'error': 'Leave request not found'}), 404
+        
     data = request.get_json()
 
     status = data.get('status')
@@ -86,6 +87,6 @@ def approve_leave(id):
         return jsonify({'error': 'Invalid status'}), 400
 
     leave.status = status
-    db.session.commit()
+    leave.save()
 
     return jsonify({'message': f'Leave {status} successfully'}), 200

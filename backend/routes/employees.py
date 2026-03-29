@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from extensions import db
+from extensions import db, bcrypt
 from models import Employee, User
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
@@ -8,12 +8,12 @@ employee_bp = Blueprint('employees', __name__)
 @employee_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_employees():
-    employees = Employee.query.all()
+    employees = Employee.objects.all()
     result = []
     for emp in employees:
         result.append({
-            'id': emp.id,
-            'user_id': emp.user_id,
+            'id': str(emp.id),
+            'user_id': str(emp.user_id.id),
             'name': emp.name,
             'role': emp.role,
             'department': emp.department,
@@ -41,42 +41,42 @@ def add_employee():
         return jsonify({'error': 'Name and email are required'}), 400
 
     # Create a User account for the employee
-    from extensions import bcrypt
-    if User.query.filter_by(email=email).first():
+    if User.objects(email=email).first():
         return jsonify({'error': 'Email already registered'}), 400
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
     new_user = User(name=name, email=email, password=hashed_password, role='employee', is_verified=True)
-    db.session.add(new_user)
-    db.session.flush()  # get the new_user.id
+    new_user.save()
 
     employee = Employee(
-        user_id=new_user.id,
+        user_id=new_user,
         name=name,
         role=role,
         department=department,
         salary=salary
     )
-    db.session.add(employee)
-    db.session.commit()
+    employee.save()
 
     return jsonify({
-        'id': employee.id,
-        'user_id': employee.user_id,
+        'id': str(employee.id),
+        'user_id': str(employee.user_id.id),
         'name': employee.name,
         'role': employee.role,
         'department': employee.department,
         'salary': employee.salary
     }), 201
 
-@employee_bp.route('/<int:id>', methods=['PUT'])
+@employee_bp.route('/<string:id>', methods=['PUT'])
 @jwt_required()
 def update_employee(id):
     claims = get_jwt()
     if claims.get('role') != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
 
-    employee = Employee.query.get_or_404(id)
+    employee = Employee.objects(id=id).first()
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+        
     data = request.get_json()
 
     employee.name = data.get('name', employee.name)
@@ -85,10 +85,10 @@ def update_employee(id):
     employee.salary = data.get('salary', employee.salary)
     employee.status = data.get('status', employee.status)
 
-    db.session.commit()
+    employee.save()
 
     return jsonify({
-        'id': employee.id,
+        'id': str(employee.id),
         'name': employee.name,
         'role': employee.role,
         'department': employee.department,
@@ -96,15 +96,21 @@ def update_employee(id):
         'status': employee.status
     }), 200
 
-@employee_bp.route('/<int:id>', methods=['DELETE'])
+@employee_bp.route('/<string:id>', methods=['DELETE'])
 @jwt_required()
 def delete_employee(id):
     claims = get_jwt()
     if claims.get('role') != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
 
-    employee = Employee.query.get_or_404(id)
-    db.session.delete(employee)
-    db.session.commit()
+    employee = Employee.objects(id=id).first()
+    if not employee:
+        return jsonify({'error': 'Employee not found'}), 404
+        
+    # Also delete the associated user?
+    user = employee.user_id
+    employee.delete()
+    if user:
+        user.delete()
 
     return jsonify({'message': 'Employee deleted successfully'}), 200
