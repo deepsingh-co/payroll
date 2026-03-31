@@ -17,6 +17,7 @@ export default function Tasks() {
 
   const [tasks, setTasks]         = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [teams, setTeams]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
@@ -28,7 +29,7 @@ export default function Tasks() {
 
   useEffect(() => {
     fetchTasks();
-    if (isAdmin) fetchEmployees();
+    if (isAdmin) { fetchEmployees(); fetchTeams(); }
   }, []);
 
   const fetchTasks = async () => {
@@ -46,12 +47,25 @@ export default function Tasks() {
     } catch (e) { console.error(e); }
   };
 
+  const fetchTeams = async () => {
+    try {
+      const res = await api.get('/teams/');
+      setTeams(res.data);
+    } catch (e) { console.error(e); }
+  };
+
+  // Only show team leaders when admin picks who to assign to
+  const leaderIds = new Set(teams.map(t => t.leader_id).filter(Boolean));
+  const assignableEmployees = isAdmin
+    ? employees.filter(e => leaderIds.has(e.id))
+    : employees;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await api.post('/tasks/', {
         ...formData,
-        assigned_to: formData.assigned_to ? parseInt(formData.assigned_to) : null,
+        assigned_to: formData.assigned_to || null,
         complexity_score: parseInt(formData.complexity_score),
         estimated_hours: parseFloat(formData.estimated_hours),
       });
@@ -215,8 +229,13 @@ export default function Tasks() {
                 <label>Assign To</label>
                 <select className="form-input" value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})}>
                   <option value="">— Unassigned —</option>
-                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
+                  {assignableEmployees.length === 0 ? (
+                    <option disabled>No team leaders found — create a team first</option>
+                  ) : assignableEmployees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
+                  ))}
                 </select>
+                {isAdmin && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>Admin can only assign tasks to Team Leaders / Department Heads</p>}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">

@@ -5,6 +5,22 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 employee_bp = Blueprint('employees', __name__)
 
+@employee_bp.route('/me', methods=['GET'])
+@jwt_required()
+def get_my_employee():
+    user_id = get_jwt_identity()
+    employee = Employee.objects(user_id=user_id).first()
+    if not employee:
+        return jsonify({'error': 'Employee record not found'}), 404
+    return jsonify({
+        'id': str(employee.id),
+        'name': employee.name,
+        'role': employee.role,
+        'department': employee.department,
+        'salary': employee.salary,
+        'status': employee.status
+    }), 200
+
 @employee_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_employees():
@@ -36,6 +52,7 @@ def add_employee():
     salary = data.get('salary', 0)
     email = data.get('email')
     password = data.get('password', 'employee123')
+    user_role = data.get('user_role', 'employee')
 
     if not name or not email:
         return jsonify({'error': 'Name and email are required'}), 400
@@ -45,7 +62,7 @@ def add_employee():
         return jsonify({'error': 'Email already registered'}), 400
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    new_user = User(name=name, email=email, password=hashed_password, role='employee', is_verified=True)
+    new_user = User(name=name, email=email, password=hashed_password, role=user_role, is_verified=True)
     new_user.save()
 
     employee = Employee(

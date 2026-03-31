@@ -80,7 +80,7 @@ export default function Dashboard() {
     </div>
   );
 
-  const fmt = (n) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(2)}`;
+  const fmt = (n) => n >= 1000 ? `₹${(n / 1000).toFixed(1)}k` : `₹${n.toFixed(2)}`;
 
   return (
     <>

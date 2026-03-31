@@ -9,6 +9,7 @@ import Tasks from './pages/Tasks';
 import Payroll from './pages/Payroll';
 import Leaves from './pages/Leaves';
 import Attendance from './pages/Attendance';
+import TeamWorkspace from './pages/TeamWorkspace';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/payroll" element={<Payroll />} />
             <Route path="/leaves" element={<Leaves />} />
             <Route path="/attendance" element={<Attendance />} />
+            <Route path="/teams/:teamId" element={<TeamWorkspace />} />
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />

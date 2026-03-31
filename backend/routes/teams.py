@@ -8,22 +8,57 @@ team_bp = Blueprint('teams', __name__)
 @team_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_teams():
-    teams = Team.objects.all()
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+    is_admin = claims.get('role') == 'admin'
+    
+    current_employee = Employee.objects(user_id=user_id).first()
+    
+    if is_admin:
+        teams = Team.objects.all()
+    elif current_employee:
+        # Check if employee is a leader of any team
+        leading_teams = Team.objects(leader=current_employee.id).all()
+        # If leader, they can see all teams (but maybe restricted view for non-owned teams?)
+        # User said: "team leader can view the other team leader"
+        if leading_teams:
+            teams = Team.objects.all()
+        else:
+            # Regular member: only teams they are part of
+            teams = Team.objects(members__in=[current_employee.id]).all()
+    else:
+        return jsonify([]), 200
+
     result = []
     for team in teams:
+        is_leader_of_this_team = current_employee and team.leader and str(team.leader.id) == str(current_employee.id)
+        is_member_of_this_team = current_employee and current_employee in team.members
+        
+        # If it's not their team and they aren't admin/leader, skip (though query already handled members)
+        # Actually, let's refine the result based on privacy
+        
         leader = Employee.objects(id=team.leader.id).first() if team.leader else None
+        
+        # Privacy logic for members: if they are just a member, they see the team details.
+        # If they are a leader, they see other teams' headers (leader info) but maybe skip full member lists of other teams?
+        
+        can_see_members = is_admin or is_leader_of_this_team or is_member_of_this_team
+        
         member_list = []
-        for emp in team.members:
-            if emp:
-                member_list.append({'id': str(emp.id), 'name': emp.name, 'role': emp.role})
+        if can_see_members:
+            for emp in team.members:
+                if emp:
+                    member_list.append({'id': str(emp.id), 'name': emp.name, 'role': emp.role})
+        
         result.append({
             'id': str(team.id),
             'name': team.name,
             'department': team.department,
             'leader_id': str(team.leader.id) if team.leader else None,
             'leader_name': leader.name if leader else 'N/A',
-            'member_count': len(member_list),
-            'members': member_list
+            'member_count': len(team.members),
+            'members': member_list,
+            'is_leader': is_leader_of_this_team
         })
     return jsonify(result), 200
 

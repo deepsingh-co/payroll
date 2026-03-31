@@ -10,12 +10,11 @@ export default function Payroll() {
   const [payrolls, setPayrolls]   = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [payTarget, setPayTarget] = useState({ type: 'all', value: '', month: '' });
   const [filterMonth, setFilterMonth] = useState('');
 
-  const [formData, setFormData] = useState({
-    employee_id: '', month: '', bonus: 0, tax: 0, deductions: 0
-  });
+
 
   useEffect(() => {
     fetchPayrolls();
@@ -37,21 +36,22 @@ export default function Payroll() {
     } catch (e) { console.error(e); }
   };
 
-  const handleSubmit = async (e) => {
+  const handleGenerateAll = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.post('/payroll/', {
-        ...formData,
-        employee_id: parseInt(formData.employee_id),
-        bonus: parseFloat(formData.bonus),
-        tax: parseFloat(formData.tax),
-        deductions: parseFloat(formData.deductions),
-      });
-      setPayrolls([res.data, ...payrolls]);
-      setShowModal(false);
-      setFormData({ employee_id: '', month: '', bonus: 0, tax: 0, deductions: 0 });
-    } catch (e) {
-      alert(e.response?.data?.error || 'Failed to generate payroll');
+      const payload = { month: payTarget.month };
+      if (payTarget.type === 'branch') payload.department = payTarget.value;
+      if (payTarget.type === 'employee') {
+        payload.employee_id = payTarget.value;
+        payload.bonus = payTarget.bonus ? parseFloat(payTarget.bonus) : 0;
+        payload.deductions = payTarget.deductions ? parseFloat(payTarget.deductions) : 0;
+      }
+      const res = await api.post('/payroll/generate_all', payload);
+      setPayrolls([...res.data.payrolls, ...payrolls]);
+      setShowPayModal(false);
+      alert(res.data.message);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to auto-generate payrolls');
     }
   };
 
@@ -60,10 +60,10 @@ export default function Payroll() {
   const filtered = filterMonth ? payrolls.filter(p => p.month === filterMonth) : payrolls;
 
   const totalNet  = filtered.reduce((s, p) => s + (p.net_salary || 0), 0);
-  const totalGross = filtered.reduce((s, p) => s + (p.basic_salary || 0) + (p.bonus || 0), 0);
+  const totalGross = filtered.reduce((s, p) => s + (p.basic_salary || 0) + (p.bonus || 0) + (p.overtime_pay || 0), 0);
   const totalTax   = filtered.reduce((s, p) => s + (p.tax || 0) + (p.deductions || 0), 0);
 
-  const fmt = (n) => `$${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <>
@@ -73,10 +73,16 @@ export default function Payroll() {
           <p style={{ color: 'var(--text-muted)' }}>Manage salaries, bonuses, and pay slips.</p>
         </div>
         {isAdmin && (
-          <button className="btn" style={{ width: 'auto' }} onClick={() => setShowModal(true)}>
-            <Plus size={18} style={{ marginRight: '0.5rem' }} />
-            Generate Payroll
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn" style={{ backgroundColor: 'var(--surface-secondary)', color: 'var(--text-main)', width: 'auto' }} onClick={() => { setPayTarget({ type: 'branch', value: '', month: '' }); setShowPayModal(true); }}>
+              <CreditCard size={18} style={{ marginRight: '0.5rem' }} />
+              Pay By Branch
+            </button>
+            <button className="btn" style={{ width: 'auto' }} onClick={() => { setPayTarget({ type: 'all', value: '', month: '' }); setShowPayModal(true); }}>
+              <CreditCard size={18} style={{ marginRight: '0.5rem' }} />
+              Pay All Employees
+            </button>
+          </div>
         )}
       </div>
 
@@ -136,6 +142,45 @@ export default function Payroll() {
         </div>
       )}
 
+      {/* Employees Table to Pay */}
+      {isAdmin && (
+        <>
+          <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Process Payments</h2>
+          <div className="table-container" style={{ marginBottom: '2rem' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Employee Name</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map(emp => (
+                  <tr key={emp.id}>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{emp.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID #{emp.id}</div>
+                    </td>
+                    <td>{emp.department}</td>
+                    <td><span className={`badge ${emp.status === 'active' ? 'active' : 'inactive'}`}>{emp.status}</span></td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button onClick={() => { setPayTarget({ type: 'employee', value: emp.id, month: '' }); setShowPayModal(true); }}
+                        style={{ background: 'rgba(16,185,129,0.1)', border: 'none', color: '#10B981', cursor: 'pointer', padding: '0.35rem 0.6rem', borderRadius: 4, fontWeight: 600, fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <CreditCard size={14} /> Pay
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Payroll History</h2>
+
       {/* Table */}
       <div className="table-container">
         <table className="table">
@@ -145,6 +190,7 @@ export default function Payroll() {
               <th>Month</th>
               <th>Basic Salary</th>
               <th>Bonus</th>
+              <th>Overtime Pay</th>
               <th>Tax</th>
               <th>Deductions</th>
               <th style={{ color: '#10B981' }}>Net Salary</th>
@@ -167,6 +213,7 @@ export default function Payroll() {
                   <td><span className="badge active">{p.month}</span></td>
                   <td>{fmt(p.basic_salary)}</td>
                   <td style={{ color: '#10B981' }}>+{fmt(p.bonus)}</td>
+                  <td style={{ color: '#10B981' }}>+{fmt(p.overtime_pay)}</td>
                   <td style={{ color: '#EF4444' }}>-{fmt(p.tax)}</td>
                   <td style={{ color: '#EF4444' }}>-{fmt(p.deductions)}</td>
                   <td style={{ fontWeight: 700, color: '#10B981' }}>{fmt(p.net_salary)}</td>
@@ -178,42 +225,49 @@ export default function Payroll() {
       </div>
 
       {/* Modal */}
-      {showModal && (
+      {showPayModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
           <div className="glass-card" style={{ maxWidth: 520, width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Generate Payroll</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+                {payTarget.type === 'branch' ? 'Pay Selected Branch' : payTarget.type === 'employee' ? 'Pay Employee' : 'Pay All Employees'}
+              </h2>
+              <button onClick={() => setShowPayModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Employee *</label>
-                <select required className="form-input" value={formData.employee_id} onChange={e => setFormData({...formData, employee_id: e.target.value})}>
-                  <option value="">Select Employee</option>
-                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} — {emp.department}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Month (YYYY-MM) *</label>
-                <input required type="month" className="form-input" value={formData.month} onChange={e => setFormData({...formData, month: e.target.value})} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <form onSubmit={handleGenerateAll}>
+              {payTarget.type === 'branch' && (
                 <div className="form-group">
-                  <label>Bonus ($)</label>
-                  <input type="number" min="0" step="0.01" className="form-input" value={formData.bonus} onChange={e => setFormData({...formData, bonus: e.target.value})} />
+                  <label>Select Branch/Department *</label>
+                  <select required className="form-input" value={payTarget.value} onChange={e => setPayTarget({...payTarget, value: e.target.value})}>
+                    <option value="">— Select —</option>
+                    {[...new Set(employees.map(e => e.department).filter(Boolean))].map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="form-group">
-                  <label>Tax ($)</label>
-                  <input type="number" min="0" step="0.01" className="form-input" value={formData.tax} onChange={e => setFormData({...formData, tax: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>Deductions ($)</label>
-                  <input type="number" min="0" step="0.01" className="form-input" value={formData.deductions} onChange={e => setFormData({...formData, deductions: e.target.value})} />
-                </div>
+              )}
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label>Target Month (YYYY-MM) *</label>
+                <input required type="month" className="form-input" value={payTarget.month} onChange={e => setPayTarget({...payTarget, month: e.target.value})} />
               </div>
+              {payTarget.type === 'employee' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Additional Bonus (₹)</label>
+                    <input type="number" min="0" step="0.01" className="form-input" value={payTarget.bonus || ''} onChange={e => setPayTarget({...payTarget, bonus: e.target.value})} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Deductions (₹)</label>
+                    <input type="number" min="0" step="0.01" className="form-input" value={payTarget.deductions || ''} onChange={e => setPayTarget({...payTarget, deductions: e.target.value})} />
+                  </div>
+                </div>
+              )}
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                This will automatically calculate basic salary, fetch attendance for overtime, tally completed task bonuses, and deduct flat 10% taxes for <strong>the selected targets</strong> that haven't been paid this month yet. A confirmation email will be automatically sent.
+              </p>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                <button type="button" className="btn" style={{ backgroundColor: 'var(--surface-secondary)', color: 'var(--text-main)' }} onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn">Generate</button>
+                <button type="button" className="btn" style={{ backgroundColor: 'var(--surface-secondary)', color: 'var(--text-main)' }} onClick={() => setShowPayModal(false)}>Cancel</button>
+                <button type="submit" className="btn" style={{ backgroundColor: '#10B981', color: 'white' }}>Process Payment</button>
               </div>
             </form>
           </div>

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Employees() {
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'admin';
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -10,7 +13,9 @@ export default function Employees() {
   
   // New Employee Form
   const [formData, setFormData] = useState({
-    user_id: '',
+    email: '',
+    password: '',
+    user_role: 'employee',
     name: '',
     role: '',
     department: '',
@@ -40,11 +45,23 @@ export default function Employees() {
         salary: parseFloat(formData.salary)
       });
       setShowModal(false);
-      setFormData({ user_id: '', name: '', role: '', department: '', salary: '' });
+      setFormData({ email: '', password: '', user_role: 'employee', name: '', role: '', department: '', salary: '' });
       fetchEmployees();
     } catch (error) {
       console.error('Error adding employee:', error);
       alert(error.response?.data?.error || 'Failed to add employee');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to remove this employee? This will also delete their user account.')) return;
+    
+    try {
+      await api.delete(`/employees/${id}`);
+      setEmployees(employees.filter(emp => emp.id !== id));
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      alert(error.response?.data?.error || 'Failed to delete employee');
     }
   };
 
@@ -112,11 +129,18 @@ export default function Employees() {
                       {emp.status}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 500 }}>${emp.salary?.toLocaleString()}/yr</td>
+                  <td style={{ fontWeight: 500 }}>₹{emp.salary?.toLocaleString('en-IN')}/yr</td>
                   <td style={{ textAlign: 'right' }}>
-                    <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}>
-                      <MoreVertical size={18} />
-                    </button>
+                    {isAdmin && (
+                      <button 
+                        onClick={() => handleDelete(emp.id)}
+                        className="btn-icon" 
+                        style={{ color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: '6px', padding: '0.5rem', cursor: 'pointer' }}
+                        title="Delete Employee"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -135,8 +159,19 @@ export default function Employees() {
             <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Add New Employee</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>User ID (Linked Account)</label>
-                <input required type="number" className="form-input" value={formData.user_id} onChange={e => setFormData({...formData, user_id: e.target.value})} />
+                <label>Email Address</label>
+                <input required type="email" className="form-input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Password</label>
+                <input required type="password" className="form-input" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>System Role</label>
+                <select className="form-input" value={formData.user_role} onChange={e => setFormData({...formData, user_role: e.target.value})}>
+                  <option value="employee">Employee</option>
+                  <option value="admin">Manager/Admin</option>
+                </select>
               </div>
               <div className="form-group">
                 <label>Full Name</label>

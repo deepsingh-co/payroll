@@ -34,14 +34,17 @@ class Task(db.Document):
     estimated_hours = db.FloatField()
     actual_hours = db.FloatField()
     deadline = db.DateTimeField()
-    status = db.StringField(max_length=20, default='pending') # pending / in-progress / completed
+    status = db.StringField(max_length=20, default='pending') # pending / in_progress / completed
     created_at = db.DateTimeField(default=datetime.utcnow)
+    team = db.ReferenceField('Team')        # team that owns this task
+    assigned_by = db.ReferenceField('Employee')  # team leader who assigned
 
 class Payroll(db.Document):
     meta = {'collection': 'payrolls'}
     employee = db.ReferenceField(Employee, required=True)
     basic_salary = db.FloatField()
     bonus = db.FloatField(default=0)
+    overtime_pay = db.FloatField(default=0)
     tax = db.FloatField(default=0)
     deductions = db.FloatField(default=0)
     net_salary = db.FloatField()
@@ -63,3 +66,25 @@ class Attendance(db.Document):
     check_out = db.DateTimeField()
     duration_hours = db.FloatField(default=0.0)
     status = db.StringField(max_length=20, default='absent')
+
+class Message(db.Document):
+    meta = {'collection': 'messages'}
+    team = db.ReferenceField(Team, required=True)
+    sender = db.ReferenceField(Employee, required=True)
+    content = db.StringField(required=True)
+    created_at = db.DateTimeField(default=datetime.utcnow)
+
+class Issue(db.Document):
+    meta = {'collection': 'issues'}
+    team = db.ReferenceField(Team, required=True)
+    raised_by = db.ReferenceField(Employee, required=True)
+    title = db.StringField(max_length=200, required=True)
+    description = db.StringField()
+    status = db.StringField(max_length=20, default='open')  # open / resolved
+    created_at = db.DateTimeField(default=datetime.utcnow)
+
+class LeaderMessage(db.Document):
+    meta = {'collection': 'leader_messages'}
+    sender = db.ReferenceField(Employee, required=True)
+    content = db.StringField(required=True)
+    created_at = db.DateTimeField(default=datetime.utcnow)

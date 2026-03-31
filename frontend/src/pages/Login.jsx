@@ -28,7 +28,7 @@ export default function Login() {
 
   const quickFill = (role) => {
     if (role === 'admin') { setEmail('admin@company.com'); setPassword('admin123'); }
-    else                  { setEmail('employee@company.com'); setPassword('employee123'); }
+    else                  { setEmail('alice@company.com'); setPassword('employee123'); }
   };
 
   return (
