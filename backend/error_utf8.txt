@@ -1,0 +1,51 @@
+﻿venv\Scripts\python : 
+Traceback (most recent 
+call last):
+At line:1 char:1
++ venv\Scripts\python 
+-c "import mongoengine" 
+2>&1 | Out-File 
+-FilePath ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo      
+        : NotSpecified  
+  : (Traceback (most    
+ recent call last)::    
+String) [], RemoteE    
+xception
+    + FullyQualifiedErr 
+   orId : NativeComman  
+  dError
+ 
+  File "<string>", line 
+1, in <module>
+    import mongoengine
+  File "C:\Users\ANURUDH
+\OneDrive\Desktop\payrol
+l\backend\venv\Lib\site-
+packages\mongoengine\__i
+nit__.py", line 2, in 
+<module>
+    from mongoengine 
+import (
+    ...<6 lines>...
+    )
+  File "C:\Users\ANURUDH
+\OneDrive\Desktop\payrol
+l\backend\venv\Lib\site-
+packages\mongoengine\con
+nection.py", line 5, in 
+<module>
+    from 
+pymongo.database import 
+_check_name
+ImportError: cannot 
+import name 
+'_check_name' from 
+'pymongo.database' (C:\U
+sers\ANURUDH\OneDrive\De
+sktop\payroll\backend\ve
+nv\Lib\site-packages\pym
+ongo\database.py)
