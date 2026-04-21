@@ -75,16 +75,12 @@ def check_out():
         return jsonify({'error': 'Employee record not found for current user'}), 404
 
     now = datetime.utcnow()
-    today_start = datetime(now.year, now.month, now.day)
-    today_end = today_start.replace(hour=23, minute=59, second=59)
     
-    record = Attendance.objects(employee=employee.id, date__gte=today_start, date__lte=today_end).first()
+    # Find the most recent check-in that doesn't have a check-out yet
+    record = Attendance.objects(employee=employee.id, check_in__ne=None, check_out=None).order_by('-check_in').first()
 
-    if not record or not record.check_in:
-        return jsonify({'error': 'Cannot check out before check-in'}), 400
-
-    if record.check_out:
-        return jsonify({'error': 'Already checked out for today'}), 400
+    if not record:
+        return jsonify({'error': 'No active check-in found. Please check in first.'}), 400
 
     record.check_out = now
     duration = (record.check_out - record.check_in).total_seconds() / 3600

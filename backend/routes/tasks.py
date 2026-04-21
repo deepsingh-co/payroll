@@ -17,11 +17,15 @@ def get_all_tasks():
     employee = Employee.objects(user_id=user_id).first()
 
     if role == 'admin':
-        tasks = Task.objects.all()
+        # Admin only sees tasks they assigned (where assigned_by is None or matches their employee record)
+        if employee:
+            tasks = Task.objects(Q(assigned_by=employee.id) | Q(assigned_by=None)).all()
+        else:
+            tasks = Task.objects(assigned_by=None).all()
     else:
         if not employee:
             return jsonify([]), 200
-        # Employees see tasks assigned TO them AND tasks assigned BY them (as managers)
+        # Managers/Employees see tasks assigned TO them OR tasks they assigned to others
         tasks = Task.objects(Q(assigned_to=employee.id) | Q(assigned_by=employee.id)).all()
 
     result = []

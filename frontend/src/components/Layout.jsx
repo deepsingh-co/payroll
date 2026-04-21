@@ -94,7 +94,7 @@ export default function Layout() {
               {user?.name?.charAt(0) || 'U'}
             </div>
             <div>
-              <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>{user?.name}</p>
+              <p style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)' }}>{user?.name}</p>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user?.role}</p>
             </div>
           </div>

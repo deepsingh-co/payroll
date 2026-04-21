@@ -97,13 +97,13 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="stats-grid">
-        {isAdmin && <StatCard label="Total Employees" value={stats.employees} icon={<Users size={20} />} color="#6366F1" sub="Active workforce" />}
-        {isAdmin && <StatCard label="Active Teams" value={stats.teams} icon={<Briefcase size={20} />} color="#10B981" sub="Current departments" />}
-        {isAdmin && <StatCard label="Pending Leaves" value={stats.pendingLeaves} icon={<Calendar size={20} />} color="#F59E0B" sub="Awaiting approval" />}
-        {isAdmin && <StatCard label="Monthly Payroll" value={fmt(stats.totalPayroll)} icon={<CreditCard size={20} />} color="#EF4444" sub={`${new Date().toLocaleString('default', { month: 'long' })} payout`} />}
-        <StatCard label="Tasks Pending" value={stats.tasksPending} icon={<Clock size={20} />} color="#D97706" sub="Need attention" />
-        <StatCard label="In Progress" value={stats.tasksInProgress} icon={<CheckSquare size={20} />} color="#6366F1" sub="Currently active" />
-        <StatCard label="Completed" value={stats.tasksDone} icon={<CheckCircle2 size={20} />} color="#10B981" sub="Finished tasks" />
+        {isAdmin && <StatCard label="Total Employees" value={stats.employees} icon={<Users size={20} />} color="var(--primary)" sub="Active workforce" />}
+        {isAdmin && <StatCard label="Active Teams" value={stats.teams} icon={<Briefcase size={20} />} color="var(--success-text)" sub="Current departments" />}
+        {isAdmin && <StatCard label="Pending Leaves" value={stats.pendingLeaves} icon={<Calendar size={20} />} color="var(--warning-text)" sub="Awaiting approval" />}
+        {isAdmin && <StatCard label="Monthly Payroll" value={fmt(stats.totalPayroll)} icon={<CreditCard size={20} />} color="var(--danger)" sub={`${new Date().toLocaleString('default', { month: 'long' })} payout`} />}
+        <StatCard label="Tasks Pending" value={stats.tasksPending} icon={<Clock size={20} />} color="var(--warning-text)" sub="Need attention" />
+        <StatCard label="In Progress" value={stats.tasksInProgress} icon={<CheckSquare size={20} />} color="var(--primary)" sub="Currently active" />
+        <StatCard label="Completed" value={stats.tasksDone} icon={<CheckCircle2 size={20} />} color="var(--success-text)" sub="Finished tasks" />
         {!isAdmin && <StatCard label="My Leave Status" value={stats.pendingLeaves} icon={<Calendar size={20} />} color="#EC4899" sub="Pending requests" />}
       </div>
 
@@ -125,7 +125,7 @@ export default function Dashboard() {
                   <div key={task.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.75rem', borderRadius: 8, backgroundColor: 'var(--surface-secondary)' }}>
                     <div>
                       <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{task.title}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{task.assignee_name}</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{task.assignee_name}</div>
                     </div>
                     <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: 9999, backgroundColor: `${color}20`, color, fontWeight: 600 }}>
                       {task.status?.replace('_', ' ')}
@@ -153,7 +153,7 @@ export default function Dashboard() {
                 return (
                   <div key={l.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.75rem', borderRadius: 8, backgroundColor: 'var(--surface-secondary)' }}>
                     <div>
-                      <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{l.employee_name}</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>{l.employee_name}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{l.type} Leave • {new Date(l.from_date).toLocaleDateString()} – {new Date(l.to_date).toLocaleDateString()}</div>
                     </div>
                     <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: 9999, backgroundColor: `${color}20`, color, fontWeight: 600 }}>

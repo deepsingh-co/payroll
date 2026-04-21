@@ -182,23 +182,26 @@ export default function Tasks() {
       {/* Stats Cards */}
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         {[
-          { key: 'all', label: 'All Tasks', color: '#6366F1', icon: <CheckSquare /> },
-          { key: 'pending', label: 'Pending', color: '#D97706', icon: <Clock /> },
-          { key: 'in_progress', label: 'In Progress', color: '#6366F1', icon: <AlertCircle /> },
+          { key: 'all', label: 'All Tasks', color: 'var(--primary)', icon: <CheckSquare /> },
+          { key: 'pending', label: 'Pending', color: 'var(--warning-text)', icon: <Clock /> },
+          { key: 'in_progress', label: 'In Progress', color: 'var(--info-text)', icon: <AlertCircle /> },
           { key: 'pending_review', label: 'In Review', color: '#EA580C', icon: <Eye /> },
-          { key: 'completed', label: 'Completed', color: '#10B981', icon: <CheckCircle2 /> },
-        ].map(card => (
-          <div key={card.key} onClick={() => setFilterStatus(card.key)} className="stat-card" style={{
-            cursor: 'pointer', background: 'var(--surface-main)', border: filterStatus === card.key ? `2px solid ${card.color}` : '1px solid var(--border)',
-            padding: '1.25rem', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-          }}>
-            <div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{card.label}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{counts[card.key]}</div>
+          { key: 'completed', label: 'Completed', color: 'var(--success-text)', icon: <CheckCircle2 /> },
+        ].map(card => {
+          const bg = card.color.startsWith('var') ? (card.color.includes('success') ? 'var(--success-bg)' : card.color.includes('warning') ? 'var(--warning-bg)' : card.color.includes('info') ? 'var(--info-bg)' : 'rgba(99,102,241,0.1)') : `${card.color}15`;
+          return (
+            <div key={card.key} onClick={() => setFilterStatus(card.key)} className="stat-card" style={{
+              cursor: 'pointer', background: 'var(--surface)', border: filterStatus === card.key ? `2px solid ${card.color}` : '1px solid var(--border)',
+              padding: '1.25rem', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow)'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{card.label}</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{counts[card.key]}</div>
+              </div>
+              <div style={{ color: card.color, background: bg, padding: '0.5rem', borderRadius: '10px' }}>{card.icon}</div>
             </div>
-            <div style={{ color: card.color, background: `${card.color}15`, padding: '0.5rem', borderRadius: '10px' }}>{card.icon}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Table */}
@@ -227,13 +230,13 @@ export default function Tasks() {
                 return (
                   <tr key={task.id} style={{ borderBottom: '1px solid var(--border)', background: task.status === 'pending_review' ? 'rgba(234,88,12,0.03)' : 'transparent' }}>
                     <td style={{ padding: '1rem' }}>
-                      <div style={{ fontWeight: 600 }}>{task.title}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{task.title}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Complexity: {COMPLEXITY_LABEL[task.complexity_score]} | {task.estimated_hours}h</div>
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#6366F120', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800 }}>{task.assignee_name?.charAt(0)}</div>
-                        <div style={{ fontSize: '0.9rem' }}>{task.assignee_name}</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{task.assignee_name}</div>
                       </div>
                     </td>
                     <td style={{ padding: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{task.assigner_name || 'Admin'}</td>

@@ -488,7 +488,7 @@ export default function Payroll() {
                     {employees.map(emp => (
                       <tr key={emp.id}>
                         <td>
-                          <div style={{ fontWeight: 500 }}>{emp.name}</div>
+                          <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{emp.name}</div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{emp.email || `ID #${emp.id}`}</div>
                         </td>
                         <td>{emp.department}</td>
@@ -553,7 +553,7 @@ export default function Payroll() {
                   <tr key={p.id}>
                     {isAdmin && (
                       <td>
-                        <div style={{ fontWeight: 500 }}>{p.employee_name}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{p.employee_name}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{p.employee_id?.slice(-6)}</div>
                       </td>
                     )}

@@ -134,7 +134,7 @@ export default function Leaves() {
                   <tr key={leave.id}>
                     {isAdmin && (
                       <td>
-                        <div style={{ fontWeight: 500 }}>{leave.employee_name}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{leave.employee_name}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Emp #{leave.employee_id}</div>
                       </td>
                     )}

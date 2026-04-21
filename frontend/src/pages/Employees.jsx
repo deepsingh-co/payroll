@@ -122,7 +122,7 @@ export default function Employees() {
               filteredEmployees.map((emp) => (
                 <tr key={emp.id}>
                   <td>
-                    <div style={{ fontWeight: 500 }}>{emp.name}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{emp.name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {emp.id}</div>
                   </td>
                   <td>{emp.role}</td>

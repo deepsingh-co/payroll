@@ -214,7 +214,7 @@ export default function TeamWorkspace() {
                         <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.7rem', color: '#6366F1' }}>
                           {task.assignee_name?.charAt(0)}
                         </div>
-                        {task.assignee_name}
+                        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>{task.assignee_name}</div>
                       </div>
                     </td>
                     <td>
@@ -273,7 +273,7 @@ export default function TeamWorkspace() {
                     {m.sender_name?.charAt(0)}
                   </div>
                   <div style={{ maxWidth: '65%' }}>
-                    {!isMine && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem', fontWeight: 600 }}>{m.sender_name}</div>}
+                    {!isMine && <div style={{ fontSize: '0.72rem', color: 'var(--text-main)', marginBottom: '0.2rem', fontWeight: 700 }}>{m.sender_name}</div>}
                     <div style={{ padding: '0.6rem 0.9rem', borderRadius: isMine ? '12px 12px 4px 12px' : '12px 12px 12px 4px', background: isMine ? 'var(--primary)' : 'var(--surface-secondary)', color: isMine ? 'white' : 'var(--text-main)', fontSize: '0.875rem', lineHeight: 1.5 }}>
                       {m.content}
                     </div>

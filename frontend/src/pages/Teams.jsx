@@ -162,11 +162,11 @@ export default function Teams() {
         </div>
         <div className="stat-card">
           <div className="stat-info"><p>Total Members</p><h3>{teams.reduce((s, t) => s + (t.member_count || 0), 0)}</h3></div>
-          <div className="stat-icon" style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10B981' }}><Users size={20} /></div>
+          <div className="stat-icon" style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success-text)' }}><Users size={20} /></div>
         </div>
         <div className="stat-card">
           <div className="stat-info"><p>Departments</p><h3>{new Set(teams.map(t => t.department).filter(Boolean)).size}</h3></div>
-          <div className="stat-icon" style={{ backgroundColor: 'rgba(245,158,11,0.1)', color: '#D97706' }}><Briefcase size={20} /></div>
+          <div className="stat-icon" style={{ backgroundColor: 'var(--warning-bg)', color: 'var(--warning-text)' }}><Briefcase size={20} /></div>
         </div>
         <div className="stat-card">
           <div className="stat-info"><p>Avg Team Size</p><h3>{teams.length ? (teams.reduce((s, t) => s + t.member_count, 0) / teams.length).toFixed(1) : 0}</h3></div>
@@ -217,7 +217,7 @@ export default function Teams() {
                     </button>
                     <button onClick={() => deleteTeam(team.id)}
                       title="Delete Team"
-                      style={{ padding: '0.375rem', background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 6, color: '#EF4444', cursor: 'pointer' }}>
+                      style={{ padding: '0.375rem', background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 6, color: 'var(--danger)', cursor: 'pointer' }}>
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -245,7 +245,7 @@ export default function Teams() {
                             {m.name?.charAt(0)}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{m.name}</div>
+                            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>{m.name}</div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.role}</div>
                           </div>
                         </div>
