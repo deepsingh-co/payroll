@@ -8,6 +8,9 @@ class User(db.Document):
     password = db.StringField(max_length=200, required=True)
     role = db.StringField(max_length=20, default='employee') # admin / employee
     is_verified = db.BooleanField(default=False)
+    verification_token = db.StringField()
+    reset_token = db.StringField()
+    reset_token_expires = db.DateTimeField()
     created_at = db.DateTimeField(default=datetime.utcnow)
 
 class Employee(db.Document):
@@ -18,6 +21,9 @@ class Employee(db.Document):
     department = db.StringField(max_length=50)
     salary = db.FloatField()
     status = db.StringField(max_length=20, default='active')
+    bank_account_number = db.StringField(max_length=50)
+    bank_ifsc = db.StringField(max_length=20)
+    bank_name = db.StringField(max_length=100)
 
 class Team(db.Document):
     meta = {'collection': 'teams'}
@@ -88,3 +94,17 @@ class LeaderMessage(db.Document):
     sender = db.ReferenceField(Employee, required=True)
     content = db.StringField(required=True)
     created_at = db.DateTimeField(default=datetime.utcnow)
+
+class PayrollTransaction(db.Document):
+    """Tracks every auto/manual payroll run as a transaction with flow steps."""
+    meta = {'collection': 'payroll_transactions'}
+    month = db.StringField(max_length=20, required=True)           # e.g. '2026-04'
+    triggered_by = db.StringField(max_length=20, default='auto')   # 'auto' | 'manual'
+    total_employees = db.IntField(default=0)
+    total_amount = db.FloatField(default=0.0)
+    # Flow steps: pending → calculating → processing → notifying → completed | failed
+    status = db.StringField(max_length=20, default='pending')
+    steps = db.ListField(db.DictField())   # [{step, status, timestamp, detail}]
+    payrolls = db.ListField(db.ReferenceField('Payroll'))
+    created_at = db.DateTimeField(default=datetime.utcnow)
+    completed_at = db.DateTimeField()

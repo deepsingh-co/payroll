@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Plus, Clock, AlertCircle, CheckCircle2, Trash2, X, User } from 'lucide-react';
+import {
+  CheckSquare, Plus, Clock, AlertCircle, CheckCircle2,
+  Trash2, X, ShieldCheck, ShieldX, Eye, PlayCircle, UserCheck
+} from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 const STATUS_STYLES = {
-  pending:     { bg: 'rgba(245,158,11,0.12)',  color: '#D97706', label: 'Pending'     },
-  in_progress: { bg: 'rgba(99,102,241,0.12)',  color: '#6366F1', label: 'In Progress' },
-  completed:   { bg: 'rgba(16,185,129,0.12)',  color: '#10B981', label: 'Completed'   },
+  pending:        { bg: 'rgba(245,158,11,0.1)',  color: '#D97706', label: 'Pending'         },
+  in_progress:    { bg: 'rgba(99,102,241,0.1)',  color: '#6366F1', label: 'In Progress'     },
+  pending_review: { bg: 'rgba(234,88,12,0.1)',   color: '#EA580C', label: 'Awaiting Review' },
+  completed:      { bg: 'rgba(16,185,129,0.1)',  color: '#10B981', label: 'Completed'        },
 };
 
 const COMPLEXITY_LABEL = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical' };
@@ -15,12 +19,14 @@ export default function Tasks() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const [tasks, setTasks]         = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [teams, setTeams]         = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [tasks, setTasks]           = useState([]);
+  const [employees, setEmployees]   = useState([]);
+  const [teams, setTeams]           = useState([]);
+  const [currentEmp, setCurrentEmp] = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [showModal, setShowModal]   = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [reviewModal, setReviewModal]   = useState(null);
 
   const [formData, setFormData] = useState({
     title: '', assigned_to: '', complexity_score: 1,
@@ -28,37 +34,50 @@ export default function Tasks() {
   });
 
   useEffect(() => {
-    fetchTasks();
-    if (isAdmin) { fetchEmployees(); fetchTeams(); }
-  }, []);
+    fetchInitialData();
+  }, [user]);
+
+  const fetchInitialData = async () => {
+    setLoading(true);
+    try {
+      const [tasksRes, empRes, teamsRes] = await Promise.all([
+        api.get('/tasks/'),
+        api.get('/employees/'),
+        api.get('/teams/')
+      ]);
+      
+      setTasks(tasksRes.data);
+      setEmployees(empRes.data);
+      setTeams(teamsRes.data);
+      
+      const mine = empRes.data.find(e => e.email === user?.email || e.user_id === user?.id);
+      setCurrentEmp(mine);
+    } catch (e) {
+      console.error('Failed to fetch task data', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
       const res = await api.get('/tasks/');
       setTasks(res.data);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
   };
 
-  const fetchEmployees = async () => {
-    try {
-      const res = await api.get('/employees/');
-      setEmployees(res.data);
-    } catch (e) { console.error(e); }
-  };
+  const myTeams = teams.filter(t => t.leader_id === currentEmp?.id);
+  const isLeader = myTeams.length > 0;
+  const canAssign = isAdmin || isLeader;
 
-  const fetchTeams = async () => {
-    try {
-      const res = await api.get('/teams/');
-      setTeams(res.data);
-    } catch (e) { console.error(e); }
-  };
-
-  // Only show team leaders when admin picks who to assign to
-  const leaderIds = new Set(teams.map(t => t.leader_id).filter(Boolean));
-  const assignableEmployees = isAdmin
-    ? employees.filter(e => leaderIds.has(e.id))
-    : employees;
+  let assignableEmployees = [];
+  if (isAdmin) {
+    const leaderIds = new Set(teams.map(t => t.leader_id).filter(Boolean));
+    assignableEmployees = employees.filter(e => leaderIds.has(e.id));
+  } else if (isLeader) {
+    const memberIds = new Set(myTeams.flatMap(t => t.member_ids || []));
+    assignableEmployees = employees.filter(e => memberIds.has(e.id));
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,12 +99,29 @@ export default function Tasks() {
   const updateStatus = async (id, status) => {
     try {
       await api.put(`/tasks/${id}`, { status });
-      setTasks(tasks.map(t => t.id === id ? { ...t, status } : t));
-    } catch (e) { console.error(e); }
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+      setReviewModal(null);
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to update task');
+    }
+  };
+
+  const startTask = async (id) => {
+    try {
+      await api.put(`/tasks/${id}`, { status: 'in_progress' });
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'in_progress' } : t));
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to start task');
+    }
+  };
+
+  const markForReview = async (id) => {
+    if (!window.confirm('Submit this task for verification?')) return;
+    await updateStatus(id, 'pending_review');
   };
 
   const deleteTask = async (id) => {
-    if (!confirm('Delete this task?')) return;
+    if (!window.confirm('Delete this task?')) return;
     try {
       await api.delete(`/tasks/${id}`);
       setTasks(tasks.filter(t => t.id !== id));
@@ -95,115 +131,123 @@ export default function Tasks() {
   const filtered = filterStatus === 'all' ? tasks : tasks.filter(t => t.status === filterStatus);
 
   const counts = {
-    all: tasks.length,
-    pending: tasks.filter(t => t.status === 'pending').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
+    all:            tasks.length,
+    pending:        tasks.filter(t => t.status === 'pending').length,
+    in_progress:    tasks.filter(t => t.status === 'in_progress').length,
+    pending_review: tasks.filter(t => t.status === 'pending_review').length,
+    completed:      tasks.filter(t => t.status === 'completed').length,
   };
 
+  const reviewTasks = tasks.filter(t => {
+    if (t.status !== 'pending_review') return false;
+    if (isAdmin) return true;
+    return t.assigned_by === currentEmp?.id;
+  });
+
   return (
-    <>
-      <div className="page-header">
+    <div className="tasks-page-container" style={{ paddingBottom: '4rem' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 className="page-title">Tasks & Workload</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Track assignments and team progress.</p>
+          <h1 className="page-title" style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.25rem' }}>Tasks Workspace</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+            {isAdmin ? 'Corporate oversight' : 'Team operations and delivery management.'}
+          </p>
         </div>
-        {isAdmin && (
-          <button className="btn" style={{ width: 'auto' }} onClick={() => setShowModal(true)}>
-            <Plus size={18} style={{ marginRight: '0.5rem' }} />
-            Assign Task
+        {canAssign && (
+          <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.25rem', borderRadius: '10px' }}>
+            <Plus size={20} /> Assign New Task
           </button>
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
+      {/* Review Banner */}
+      {reviewTasks.length > 0 && (
+        <div className="review-banner" style={{
+          background: 'linear-gradient(135deg, rgba(234,88,12,0.1), rgba(251,146,60,0.05))',
+          border: '1px solid rgba(234,88,12,0.2)',
+          borderRadius: '16px', padding: '1.25rem', marginBottom: '2rem',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ background: '#EA580C20', color: '#EA580C', padding: '0.75rem', borderRadius: '50%' }}><UserCheck size={24} /></div>
+            <div>
+              <div style={{ fontWeight: 700, color: '#EA580C' }}>{reviewTasks.length} Pending Verification Requests</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Action required: Review submitted deliverables.</div>
+            </div>
+          </div>
+          <button className="btn" style={{ background: '#EA580C', color: '#fff' }} onClick={() => setFilterStatus('pending_review')}>Review Tasks</button>
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         {[
-          { key: 'all',         label: 'Total Tasks',    icon: <CheckSquare size={20} />, color: '#6366F1' },
-          { key: 'pending',     label: 'Pending',        icon: <Clock size={20} />,       color: '#D97706' },
-          { key: 'in_progress', label: 'In Progress',    icon: <AlertCircle size={20} />, color: '#6366F1' },
-          { key: 'completed',   label: 'Completed',      icon: <CheckCircle2 size={20} />,color: '#10B981' },
+          { key: 'all', label: 'All Tasks', color: '#6366F1', icon: <CheckSquare /> },
+          { key: 'pending', label: 'Pending', color: '#D97706', icon: <Clock /> },
+          { key: 'in_progress', label: 'In Progress', color: '#6366F1', icon: <AlertCircle /> },
+          { key: 'pending_review', label: 'In Review', color: '#EA580C', icon: <Eye /> },
+          { key: 'completed', label: 'Completed', color: '#10B981', icon: <CheckCircle2 /> },
         ].map(card => (
-          <div key={card.key} className="stat-card" style={{ cursor: 'pointer', border: filterStatus === card.key ? `2px solid ${card.color}` : '1px solid var(--border)' }}
-            onClick={() => setFilterStatus(card.key)}>
-            <div className="stat-info">
-              <p>{card.label}</p>
-              <h3>{counts[card.key]}</h3>
+          <div key={card.key} onClick={() => setFilterStatus(card.key)} className="stat-card" style={{
+            cursor: 'pointer', background: 'var(--surface-main)', border: filterStatus === card.key ? `2px solid ${card.color}` : '1px solid var(--border)',
+            padding: '1.25rem', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{card.label}</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{counts[card.key]}</div>
             </div>
-            <div className="stat-icon" style={{ backgroundColor: `${card.color}20`, color: card.color }}>
-              {card.icon}
-            </div>
+            <div style={{ color: card.color, background: `${card.color}15`, padding: '0.5rem', borderRadius: '10px' }}>{card.icon}</div>
           </div>
         ))}
       </div>
 
-      {/* Tasks Table */}
-      <div className="table-container">
-        <table className="table">
+      {/* Table */}
+      <div className="table-container" style={{ background: 'var(--surface-main)', borderRadius: '16px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr>
-              <th>Task</th>
-              <th>Assigned To</th>
-              <th>Complexity</th>
-              <th>Est. Hours</th>
-              <th>Deadline</th>
-              <th>Status</th>
-              {(isAdmin) && <th style={{ textAlign: 'right' }}>Actions</th>}
+            <tr style={{ background: 'var(--surface-secondary)', textAlign: 'left' }}>
+              <th style={{ padding: '1rem' }}>Task Details</th>
+              <th style={{ padding: '1rem' }}>Assignee</th>
+              <th style={{ padding: '1rem' }}>Verifier</th>
+              <th style={{ padding: '1rem' }}>Status</th>
+              <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>Loading tasks...</td></tr>
+              <tr><td colSpan="5" style={{ textAlign: 'center', padding: '3rem' }}>Fetching data...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No tasks found.</td></tr>
+              <tr><td colSpan="5" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>No tasks found in this view.</td></tr>
             ) : (
               filtered.map(task => {
                 const st = STATUS_STYLES[task.status] || STATUS_STYLES.pending;
+                const isAssignedToMe = task.assigned_to === currentEmp?.id;
+                const canVerify = isAdmin || (task.assigned_by === currentEmp?.id);
+                
                 return (
-                  <tr key={task.id}>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{task.title}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID #{task.id}</div>
+                  <tr key={task.id} style={{ borderBottom: '1px solid var(--border)', background: task.status === 'pending_review' ? 'rgba(234,88,12,0.03)' : 'transparent' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ fontWeight: 600 }}>{task.title}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Complexity: {COMPLEXITY_LABEL[task.complexity_score]} | {task.estimated_hours}h</div>
                     </td>
-                    <td>
+                    <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#6366F1' }}>
-                          {task.assignee_name?.charAt(0) || '?'}
-                        </div>
-                        {task.assignee_name || 'Unassigned'}
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#6366F120', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800 }}>{task.assignee_name?.charAt(0)}</div>
+                        <div style={{ fontSize: '0.9rem' }}>{task.assignee_name}</div>
                       </div>
                     </td>
-                    <td>
-                      <span style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem', borderRadius: 4, backgroundColor: task.complexity_score >= 3 ? 'rgba(239,68,68,0.1)' : 'rgba(99,102,241,0.1)', color: task.complexity_score >= 3 ? '#EF4444' : '#6366F1', fontWeight: 600 }}>
-                        {COMPLEXITY_LABEL[task.complexity_score] || task.complexity_score}
-                      </span>
+                    <td style={{ padding: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{task.assigner_name || 'Admin'}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '0.35rem 0.75rem', borderRadius: '8px', background: st.bg, color: st.color, border: `1px solid ${st.color}30` }}>{st.label}</span>
                     </td>
-                    <td>{task.estimated_hours}h</td>
-                    <td style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                      {task.deadline ? new Date(task.deadline).toLocaleDateString() : '—'}
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        {isAssignedToMe && task.status === 'pending' && <button className="action-btn" style={{ background: '#6366F1', color: '#fff' }} onClick={() => startTask(task.id)}><PlayCircle size={14} /> Start</button>}
+                        {isAssignedToMe && (task.status === 'in_progress' || task.status === 'pending') && <button className="action-btn" style={{ background: '#10B981', color: '#fff' }} onClick={() => markForReview(task.id)}><CheckCircle2 size={14} /> Mark Done</button>}
+                        {canVerify && task.status === 'pending_review' && <button className="action-btn" style={{ background: '#EA580C', color: '#fff' }} onClick={() => setReviewModal(task)}><ShieldCheck size={14} /> Verify</button>}
+                        {(isAdmin || task.assigned_by === currentEmp?.id) && <button onClick={() => deleteTask(task.id)} style={{ color: '#EF4444', border: 'none', background: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>}
+                      </div>
                     </td>
-                    <td>
-                      {isAdmin ? (
-                        <select
-                          value={task.status}
-                          onChange={e => updateStatus(task.id, e.target.value)}
-                          style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', borderRadius: 6, border: '1px solid var(--border)', backgroundColor: st.bg, color: st.color, fontWeight: 600, cursor: 'pointer' }}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      ) : (
-                        <span style={{ fontSize: '0.8rem', padding: '0.25rem 0.625rem', borderRadius: 9999, backgroundColor: st.bg, color: st.color, fontWeight: 600 }}>{st.label}</span>
-                      )}
-                    </td>
-                    {isAdmin && (
-                      <td style={{ textAlign: 'right' }}>
-                        <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.25rem' }}>
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    )}
                   </tr>
                 );
               })
@@ -212,58 +256,74 @@ export default function Tasks() {
         </table>
       </div>
 
-      {/* Modal */}
+      {/* Verification Modal */}
+      {reviewModal && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}>
+          <div className="glass-card" style={{ width: '450px', background: 'var(--surface-main)', padding: '2rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Review Deliverables</h2>
+              <button onClick={() => setReviewModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X /></button>
+            </div>
+            <div style={{ background: 'rgba(234,88,12,0.05)', padding: '1.25rem', borderRadius: '16px', marginBottom: '1.5rem', border: '1px solid rgba(234,88,12,0.1)' }}>
+              <div style={{ fontWeight: 700, color: '#EA580C', marginBottom: '0.5rem' }}>{reviewModal.title}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Assigned to: {reviewModal.assignee_name} | Complexity: {COMPLEXITY_LABEL[reviewModal.complexity_score]}</div>
+            </div>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.6 }}>Verify the deliverables. Approval will close the task and trigger bonus points. Rejection will send it back for revision.</p>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: '1.5px solid #EF4444', color: '#EF4444', background: '#EF444405', fontWeight: 700, cursor: 'pointer' }} onClick={() => updateStatus(reviewModal.id, 'in_progress')}>Reject</button>
+              <button style={{ flex: 1, padding: '0.85rem', borderRadius: '12px', border: 'none', color: '#fff', background: '#10B981', fontWeight: 700, cursor: 'pointer' }} onClick={() => updateStatus(reviewModal.id, 'completed')}>Approve</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task Creation Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-          <div className="glass-card" style={{ maxWidth: 520, width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Assign New Task</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}>
+          <div className="glass-card" style={{ width: '500px', background: 'var(--surface-main)', padding: '2rem', borderRadius: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Assign Work</h2>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X /></button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Task Title *</label>
-                <input required type="text" className="form-input" placeholder="e.g. Design new landing page" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Task Title</label>
+                <input required className="form-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--surface-secondary)' }} value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
               </div>
-              <div className="form-group">
-                <label>Assign To</label>
-                <select className="form-input" value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})}>
-                  <option value="">— Unassigned —</option>
-                  {assignableEmployees.length === 0 ? (
-                    <option disabled>No team leaders found — create a team first</option>
-                  ) : assignableEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
-                  ))}
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Assign To</label>
+                <select required className="form-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--surface-secondary)' }} value={formData.assigned_to} onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}>
+                  <option value="">Select individual...</option>
+                  {assignableEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
                 </select>
-                {isAdmin && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>Admin can only assign tasks to Team Leaders / Department Heads</p>}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label>Complexity</label>
-                  <select className="form-input" value={formData.complexity_score} onChange={e => setFormData({...formData, complexity_score: e.target.value})}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Complexity</label>
+                  <select className="form-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '10px' }} value={formData.complexity_score} onChange={e => setFormData({ ...formData, complexity_score: e.target.value })}>
                     <option value={1}>Low</option>
                     <option value={2}>Medium</option>
                     <option value={3}>High</option>
-                    <option value={4}>Critical</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Estimated Hours</label>
-                  <input type="number" min="0.5" step="0.5" className="form-input" value={formData.estimated_hours} onChange={e => setFormData({...formData, estimated_hours: e.target.value})} />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Hours</label>
+                  <input type="number" className="form-input" style={{ width: '100%', padding: '0.75rem', borderRadius: '10px' }} value={formData.estimated_hours} onChange={e => setFormData({ ...formData, estimated_hours: e.target.value })} />
                 </div>
               </div>
-              <div className="form-group">
-                <label>Deadline</label>
-                <input type="datetime-local" className="form-input" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} />
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                <button type="button" className="btn" style={{ backgroundColor: 'var(--surface-secondary)', color: 'var(--text-main)' }} onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn">Create Task</button>
-              </div>
+              <button className="btn btn-primary" type="submit" style={{ width: '100%', padding: '1rem', borderRadius: '12px', fontWeight: 700 }}>Deploy Task</button>
             </form>
           </div>
         </div>
       )}
-    </>
+
+      <style>{`
+        .action-btn {
+          border: none; padding: 0.4rem 0.75rem; borderRadius: 8px; font-size: 0.8rem; font-weight: 700;
+          display: flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: opacity 0.2s;
+        }
+        .action-btn:hover { opacity: 0.9; }
+      `}</style>
+    </div>
   );
 }

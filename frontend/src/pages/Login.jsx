@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn, Zap } from 'lucide-react';
 
@@ -61,7 +61,10 @@ export default function Login() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="password">Password</label>
+              <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: '#6366F1', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</Link>
+            </div>
             <input
               type="password" id="password" className="form-input"
               value={password} onChange={e => setPassword(e.target.value)}

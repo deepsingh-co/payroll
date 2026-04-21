@@ -4,7 +4,7 @@ from routes.auth import auth_bp
 from routes.employees import employee_bp
 from routes.teams import team_bp
 from routes.tasks import task_bp
-from routes.payroll import payroll_bp
+from routes.payroll import payroll_bp, init_scheduler
 from routes.leaves import leave_bp
 from routes.attendance import attendance_bp
 from routes.chat import chat_bp
@@ -49,9 +49,13 @@ def create_app():
     @app.route('/api/health')
     def health_check():
         return jsonify({'status': 'ok'}), 200
+
+    # Start background scheduler for auto payroll (last day of each month at 23:00 UTC)
+    init_scheduler(app)
         
     return app
 
 if __name__ == '__main__':
     app = create_app()
     app.run(debug=True)
+

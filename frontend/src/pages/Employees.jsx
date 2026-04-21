@@ -19,7 +19,10 @@ export default function Employees() {
     name: '',
     role: '',
     department: '',
-    salary: ''
+    salary: '',
+    bank_account_number: '',
+    bank_ifsc: '',
+    bank_name: ''
   });
 
   useEffect(() => {
@@ -45,7 +48,7 @@ export default function Employees() {
         salary: parseFloat(formData.salary)
       });
       setShowModal(false);
-      setFormData({ email: '', password: '', user_role: 'employee', name: '', role: '', department: '', salary: '' });
+      setFormData({ email: '', password: '', user_role: 'employee', name: '', role: '', department: '', salary: '', bank_account_number: '', bank_ifsc: '', bank_name: '' });
       fetchEmployees();
     } catch (error) {
       console.error('Error adding employee:', error);
@@ -153,9 +156,9 @@ export default function Employees() {
       {showModal && (
         <div style={{ 
           position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', 
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem'
         }}>
-          <div className="glass-card" style={{ maxWidth: '500px' }}>
+          <div className="glass-card" style={{ maxWidth: '500px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Add New Employee</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -191,6 +194,23 @@ export default function Employees() {
                 <label>Salary (Annual)</label>
                 <input required type="number" className="form-input" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})} />
               </div>
+
+              <h3 style={{ marginTop: '1rem', marginBottom: '0.5rem', fontSize: '1.1rem', color: 'var(--text-main)' }}>Bank Details</h3>
+              <div className="form-group">
+                <label>Bank Name</label>
+                <input type="text" className="form-input" value={formData.bank_name} onChange={e => setFormData({...formData, bank_name: e.target.value})} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label>Account Number</label>
+                  <input type="text" className="form-input" value={formData.bank_account_number} onChange={e => setFormData({...formData, bank_account_number: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>IFSC Code</label>
+                  <input type="text" className="form-input" value={formData.bank_ifsc} onChange={e => setFormData({...formData, bank_ifsc: e.target.value})} />
+                </div>
+              </div>
+
               <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
                 <button type="button" className="btn" style={{ backgroundColor: 'var(--surface-secondary)', color: 'var(--text-main)' }} onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn">Save Employee</button>

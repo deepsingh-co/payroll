@@ -1,6 +1,6 @@
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LayoutDashboard, Users, Briefcase, CheckSquare, CreditCard, Calendar, Clock, LogOut, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, CheckSquare, CreditCard, Calendar, Clock, LogOut, Loader2, TrendingUp } from 'lucide-react';
 
 export default function Layout() {
   const { user, loading, logout } = useAuth();
@@ -26,6 +26,7 @@ export default function Layout() {
     { name: 'Payroll', path: '/payroll', icon: <CreditCard size={20} /> },
     { name: 'Leaves', path: '/leaves', icon: <Calendar size={20} /> },
     { name: 'Attendance', path: '/attendance', icon: <Clock size={20} /> },
+    { name: 'Progress', path: '/progress', icon: <TrendingUp size={20} /> },
   ];
 
   const handleLogout = () => {

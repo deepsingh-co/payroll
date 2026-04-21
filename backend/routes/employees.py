@@ -18,7 +18,10 @@ def get_my_employee():
         'role': employee.role,
         'department': employee.department,
         'salary': employee.salary,
-        'status': employee.status
+        'status': employee.status,
+        'bank_account_number': employee.bank_account_number,
+        'bank_ifsc': employee.bank_ifsc,
+        'bank_name': employee.bank_name
     }), 200
 
 @employee_bp.route('/', methods=['GET'])
@@ -34,7 +37,10 @@ def get_employees():
             'role': emp.role,
             'department': emp.department,
             'salary': emp.salary,
-            'status': emp.status
+            'status': emp.status,
+            'bank_account_number': emp.bank_account_number,
+            'bank_ifsc': emp.bank_ifsc,
+            'bank_name': emp.bank_name
         })
     return jsonify(result), 200
 
@@ -53,6 +59,10 @@ def add_employee():
     email = data.get('email')
     password = data.get('password', 'employee123')
     user_role = data.get('user_role', 'employee')
+    
+    bank_account_number = data.get('bank_account_number', '')
+    bank_ifsc = data.get('bank_ifsc', '')
+    bank_name = data.get('bank_name', '')
 
     if not name or not email:
         return jsonify({'error': 'Name and email are required'}), 400
@@ -70,7 +80,10 @@ def add_employee():
         name=name,
         role=role,
         department=department,
-        salary=salary
+        salary=salary,
+        bank_account_number=bank_account_number,
+        bank_ifsc=bank_ifsc,
+        bank_name=bank_name
     )
     employee.save()
 
@@ -80,7 +93,10 @@ def add_employee():
         'name': employee.name,
         'role': employee.role,
         'department': employee.department,
-        'salary': employee.salary
+        'salary': employee.salary,
+        'bank_account_number': employee.bank_account_number,
+        'bank_ifsc': employee.bank_ifsc,
+        'bank_name': employee.bank_name
     }), 201
 
 @employee_bp.route('/<string:id>', methods=['PUT'])
@@ -101,6 +117,10 @@ def update_employee(id):
     employee.department = data.get('department', employee.department)
     employee.salary = data.get('salary', employee.salary)
     employee.status = data.get('status', employee.status)
+    
+    employee.bank_account_number = data.get('bank_account_number', employee.bank_account_number)
+    employee.bank_ifsc = data.get('bank_ifsc', employee.bank_ifsc)
+    employee.bank_name = data.get('bank_name', employee.bank_name)
 
     employee.save()
 
